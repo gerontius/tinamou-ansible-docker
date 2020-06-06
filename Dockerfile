@@ -14,6 +14,7 @@ RUN yum makecache fast \
       which \
       python3-pip \
       vim \
+      git \
   && yum clean all
 
 # Install systemd -- See https://hub.docker.com/_/centos/
@@ -27,7 +28,14 @@ rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
 rm -f /lib/systemd/system/basic.target.wants/*;\
 rm -f /lib/systemd/system/anaconda.target.wants/*;
 
-ENV pip_packages "ansible"
+RUN pip3 install $pip_packages
+
+RUN mkdir -p /etc/ansible
+RUN echo -e '[local]\nlocalhost ansible_connection=local' > /etc/ansible/hosts
+
+RUN yum -y install wget && \
+    cd /etc/ansible \
+ && wget https://raw.githubusercontent.com/ansible/ansible/devel/examples/ansible.cfg
 
 VOLUME ["/sys/fs/cgroup"]
 CMD ["/usr/lib/systemd/systemd"]
