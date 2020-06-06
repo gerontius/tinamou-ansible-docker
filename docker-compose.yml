@@ -1,0 +1,11 @@
+version: '3.6'
+services:
+   ansible:
+    image: tinamou/ansible-centos:1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: anstin
+    volumes:
+      - ./ansible:/etc/ansible
+
