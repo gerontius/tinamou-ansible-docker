@@ -16,7 +16,7 @@ RUN yum makecache fast \
       vim \
       git \
   && yum clean all
-
+  
 # Install systemd -- See https://hub.docker.com/_/centos/
 RUN yum -y update; yum clean all; \
 (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
@@ -31,6 +31,7 @@ rm -f /lib/systemd/system/anaconda.target.wants/*;
 RUN pip3 install $pip_packages
 
 RUN mkdir -p /etc/ansible
+RUN useradd ansible 
 RUN echo -e '[local]\nlocalhost ansible_connection=local' > /etc/ansible/hosts
 
 RUN yum -y install wget && \

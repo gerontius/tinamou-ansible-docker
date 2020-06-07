@@ -8,4 +8,4 @@ services:
     container_name: anstin
     volumes:
       - ./ansible:/etc/ansible
-
+      - /Users/ed/.ssh:/home/ansible/.ssh
