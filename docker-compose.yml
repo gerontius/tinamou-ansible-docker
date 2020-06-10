@@ -6,6 +6,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: anstin
+    environment:
+      - AWS_PROFILE=${AWS_PROFILE}
     volumes:
       - ./ansible:/etc/ansible
       - /Users/ed/.ssh:/home/ansible/.ssh
+      - /Users/ed/.aws/:/home/ansible/.aws:ro

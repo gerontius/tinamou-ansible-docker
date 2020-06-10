@@ -38,6 +38,9 @@ RUN yum -y install wget && \
     cd /etc/ansible \
  && wget https://raw.githubusercontent.com/ansible/ansible/devel/examples/ansible.cfg
 
+RUN pip3 install awscli && \
+    pip3 install boto boto3
+
 VOLUME ["/sys/fs/cgroup"]
 CMD ["/usr/lib/systemd/systemd"]
 
