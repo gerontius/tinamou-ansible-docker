@@ -14,7 +14,6 @@
     image: ami-0d18882e2647f50e7
     id: "bpmgt"
     sec_group: "test-security-group"
-    vpc_id: "vpc-3f394757"
 
   tasks:
     
