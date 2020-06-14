@@ -11,4 +11,4 @@ services:
     volumes:
       - ./ansible:/etc/ansible
       - /Users/ed/.ssh:/home/ansible/.ssh
-      - /Users/ed/.aws/:/home/ansible/.aws:ro
+      - /Users/ed/.aws/:/home/ansible/.aws

@@ -1,0 +1,57 @@
+#AWS Playbook for VPC Creation
+---
+
+
+- hosts: localhost
+  connection: local
+  gather_facts: False
+  vars_files:
+    - group_vars/sts.yml
+
+  vars:
+    key_name: bpmgtaws
+    region: eu-west-2
+    image: ami-0d18882e2647f50e7
+    id: "bpmgt"
+    sec_group: "test-security-group"
+    vpc_id: "vpc-3f394757"
+
+  tasks:
+    
+    - name: Facts
+      block:
+          
+      - name: Name for sts_assume_role module.
+        sts_assume_role:
+         profile: "{{sts_profile}}"
+         region: "{{region}}"
+         role_arn: "{{sts_role_arn}}"
+         role_session_name: "{{sts_role_session_name}}" 
+        register: assumed_role
+        when: sts
+      
+      - name: Retrieve STS Credentials
+        set_fact:
+          sts_aws_access_key: "{{ hostvars['localhost']['assumed_role'].sts_creds.access_key }}"
+          sts_aws_secret_key: "{{ hostvars['localhost']['assumed_role'].sts_creds.secret_key }}"
+          sts_security_token: "{{ hostvars['localhost']['assumed_role'].sts_creds.session_token }}"
+        when: sts
+
+      - name: AWS Create Security Group
+        local_action:
+          module: ec2_group
+          aws_access_key: "{{ sts_aws_access_key | default(omit) }}"
+          aws_secret_key: "{{ sts_aws_secret_key | default(omit) }}"
+          security_token: "{{ sts_security_token | default(omit) }}"
+          name: "{{sec_group}}"
+          description: "{{sec_group}} - Created by Ansible"
+          vpc_id: "{{vpc_id}}"
+          region: "{{region}}"
+          rules:
+            - proto: tcp
+              from_port: 80
+              to_port: 80
+              cidr_ip: 0.0.0.0/0
+        register: sg    
+
+    #tags: always

@@ -1,9 +1,12 @@
 #AWS Playbook for EC2
-
 ---
+
+
 - hosts: localhost
   connection: local
   gather_facts: False
+  vars_files:
+    - group_vars/sts.yml
 
   vars:
     key_name: bpmgtaws
@@ -13,19 +16,57 @@
     sec_group: "{{ id }}-sec"
 
   tasks:
+    
     - name: Facts
-    block:
+      block:
 
-    - name: Get EC2 instance info.
-      ec2_instance_info:
-       aws_access_key: "{{ ec2_access_key }}"
-       aws_secret_key: "{{ ec2_secret_access_key }}"
-       region: "{{ region }}"
-      register: result
+      - name: Get EC2 instance info.
+        ec2_instance_info:
+          aws_access_key: "{{ec2_access_key}}"
+          aws_secret_key: "{{ec2_secret_key}}"
+          region: "{{ region }}" 
+        register: result
 
-    - name: Instance ID
+      - name: Instance ID
         debug:
           msg: "ID: {{ item.instance_id }} - State: {{ item.state.name }} - Public DNS: {{ item.public_dns_name }}"
         loop: "{{ result.instances }}"
 
-    tags: always
+      tags: always
+     
+    - name: Provisioning EC2 instances
+      block:
+      
+      - name: Upload public key to AWS
+        ec2_key:
+          name: "{{ key_name }}"
+          key_material: "{{ lookup('file', '/home/ansible/.ssh/{{ key_name }}.pub') }}"
+          region: "{{ region }}"
+          aws_access_key: "{{ec2_access_key}}"
+          aws_secret_key: "{{ec2_secret_key}}"
+
+      - name: Name for ec2 module.
+        ec2:
+          profile: "{{ profile }}"
+          #assign_public_ip: yes
+          aws_access_key: "{{ec2_access_key}}"
+          aws_secret_key: "{{ec2_secret_key}}"
+          count: 1
+          #group_id: sg-0d43fe6d
+          #id: "{{ id }}"
+          image: "{{ image }}"
+          instance_type: t3a.small
+          key_name: "{{ key_name }}"
+          region: "{{ region }}"
+          volumes:
+            - device_name: /dev/sdb
+              #snapshot: snap-0b31880fb47001931
+              volume_type: gp2
+              #iops: 100
+              volume_size: 10
+              delete_on_termination: false
+          wait: true
+
+      tags: ['never', 'create_ec2']
+
+    #tags: always
