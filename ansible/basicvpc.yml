@@ -9,14 +9,16 @@
     - group_vars/sts.yml
 
   vars:
-    key_name: bpmgtaws
+    key_name: tfp
     region: eu-west-2
     image: ami-0d18882e2647f50e7
     id: "bpmgt"
-    sec_group: "test-security-group"
+    sec_group: "June-20-security-group"
     vpc_name: "TFP-vpc"
+    acl_name: "{{ vpc_name }} ACL"
     vpc_subnet_one: "{{ vpc_name }} Subnet One"
     vpc_subnet_two: "{{ vpc_name }} Subnet Two"
+    image_id: ami-0d18882e2647f50e7
 
   tasks:
 
@@ -52,33 +54,48 @@
           tenancy: default
         register: vpc
 
+      - name: Name for ec2_vpc_igw module.
+        ec2_vpc_igw:
+          aws_access_key: "{{ sts_aws_access_key | default(omit) }}"
+          aws_secret_key: "{{ sts_aws_secret_key | default(omit) }}"
+          security_token: "{{ sts_security_token | default(omit) }}"
+          region: "{{ region }}"
+          profile: "{{ profile }}"
+          state: present
+          tags:
+            Name: IGW
+          vpc_id: "{{ vpc.vpc.id }}"
+        register: igw
+
       - name: Create first VPC subnet.
         ec2_vpc_subnet:
           aws_access_key: "{{ sts_aws_access_key | default(omit) }}"
           aws_secret_key: "{{ sts_aws_secret_key | default(omit) }}"
           security_token: "{{ sts_security_token | default(omit) }}"
           az: eu-west-2a
+          map_public: yes
           cidr: 10.0.1.0/24
           profile: "{{ profile }}"
           region: "{{ region }}"
           state: present
           tags:
-            Name: {{ vpc_subnet_one }}
+            Name: "{{ vpc_subnet_one }}"
           vpc_id: "{{ vpc.vpc.id }}"
         register: subnet_one
-      
+
       - name: Create second VPC subnet.
         ec2_vpc_subnet:
           aws_access_key: "{{ sts_aws_access_key | default(omit) }}"
           aws_secret_key: "{{ sts_aws_secret_key | default(omit) }}"
           security_token: "{{ sts_security_token | default(omit) }}"
           az: eu-west-2b
+          map_public: yes
           cidr: 10.0.4.0/24
           profile: "{{ profile }}"
           region: "{{ region }}"
           state: present
           tags:
-            Name: {{ vpc_subnet_two }}
+            Name: "{{ vpc_subnet_two }}"
           vpc_id: "{{ vpc.vpc.id }}"
         register: subnet_two
 
@@ -98,31 +115,40 @@
               to_port: 80
               cidr_ip: 0.0.0.0/0
         register: sg
-     
-      # aws_access_key: AWS access key. If not set then the value of the 
-      # aws_secret_key: AWS secret key. If not set then the value of the 
-      # debug_botocore_endpoint_logs: Use a botocore.endpoint logger to parse the 
-      # ec2_url: Url to use to connect to EC2 or your Eucalyptus 
-      # egress: A list of rules for outgoing traffic. Each rule 
-      # ingress: List of rules for incoming traffic. Each rule 
-      # nacl_id: NACL id identifying a network ACL. One and only 
-      # name: Tagged name identifying a network ACL. One and 
-      # profile: Uses a boto profile. Only works with boto >= 
-      # region: The AWS region to use. If not specified then the 
-      # : ec2_region 
-      # security_token: AWS STS security token. If not set then the 
-      # state: Creates or modifies an existing NACL Deletes a 
-      # subnets: The list of subnets that should be associated 
-      # tags: Dictionary of tags to look for and apply when 
-      # validate_certs: When set to "no", SSL certificates will not be 
-      # vpc_id: VPC id of the requesting VPC. Required when 
+
+      # aws_access_key: AWS access key. If not set then the value of the
+      # aws_secret_key: AWS secret key. If not set then the value of the
+      # debug_botocore_endpoint_logs: Use a botocore.endpoint logger to parse the
+      # ec2_url: Url to use to connect to EC2 or your Eucalyptus
+      # egress: A list of rules for outgoing traffic. Each rule
+      # ingress: List of rules for incoming traffic. Each rule
+      # nacl_id: NACL id identifying a network ACL. One and only
+      # name: Tagged name identifying a network ACL. One and
+      # profile: Uses a boto profile. Only works with boto >=
+      # region: The AWS region to use. If not specified then the
+      # : ec2_region
+      # security_token: AWS STS security token. If not set then the
+      # state: Creates or modifies an existing NACL Deletes a
+      # subnets: The list of subnets that should be associated
+      # tags: Dictionary of tags to look for and apply when
+      # validate_certs: When set to "no", SSL certificates will not be
+      # vpc_id: VPC id of the requesting VPC. Required when
       - name: VPC NACL
         ec2_vpc_nacl:
           aws_access_key: "{{ sts_aws_access_key | default(omit) }}"
           aws_secret_key: "{{ sts_aws_secret_key | default(omit) }}"
           security_token: "{{ sts_security_token | default(omit) }}"
-          egress: "#"
-          ingress: "#"
+          # rule no, protocol, allow/deny, cidr, icmp_type, icmp_code,
+        #                                             port from, port to
+          ingress:
+            - [100, 'tcp', 'allow', '0.0.0.0/0', null, null, 22, 22]
+            - [110, 'tcp', 'allow', '0.0.0.0/0', null, null, 80, 80]
+            - [120, 'tcp', 'allow', '0.0.0.0/0', null, null, 443, 443]
+            - [130, 'tcp', 'allow', '0.0.0.0/0', null, null, 32768, 65535]
+          egress:
+            - [100, 'tcp', 'allow', '0.0.0.0/0', null, null, 80, 80]
+            - [110, 'tcp', 'allow', '0.0.0.0/0', null, null, 443, 443]
+            - [120, 'tcp', 'allow', '0.0.0.0/0', null, null, 32768, 65535]
           name: "{{ acl_name }}"
           profile: "{{ profile }}"
           region: "{{ region }}"
@@ -133,54 +159,69 @@
             Description: "{{ acl_name }}"
           vpc_id: "{{ vpc.vpc.id }}"
         register: nacl
-      
-      # aws_access_key: AWS access key. If not set then the value of the 
-      # aws_secret_key: AWS secret key. If not set then the value of the 
-      # debug_botocore_endpoint_logs: Use a botocore.endpoint logger to parse the 
-      # ec2_url: Url to use to connect to EC2 or your Eucalyptus 
-      # lookup: Look up route table by either tags or by route 
-      # profile: Uses a boto profile. Only works with boto >= 
-      # propagating_vgw_ids: Enable route propagation from virtual gateways 
-      # purge_routes: Purge existing routes that are not found in 
-      # purge_subnets: Purge existing subnets that are not found in 
-      # purge_tags: Purge existing tags that are not found in route 
-      # region: The AWS region to use. If not specified then the 
-      # : ec2_region 
-      # route_table_id: The ID of the route table to update or delete. 
-      # routes: List of routes in the route table. Routes are 
-      # security_token: AWS STS security token. If not set then the 
-      # state: Create or destroy the VPC route table 
-      # subnets: An array of subnets to add to this route table. 
-      # tags: A dictionary of resource tags of the form: { 
-      # validate_certs: When set to "no", SSL certificates will not be 
-      # vpc_id: (required) VPC ID of the VPC in which to create 
+
+      # aws_access_key: AWS access key. If not set then the value of the
+      # aws_secret_key: AWS secret key. If not set then the value of the
+      # debug_botocore_endpoint_logs: Use a botocore.endpoint logger to parse the
+      # ec2_url: Url to use to connect to EC2 or your Eucalyptus
+      # lookup: Look up route table by either tags or by route
+      # profile: Uses a boto profile. Only works with boto >=
+      # propagating_vgw_ids: Enable route propagation from virtual gateways
+      # purge_routes: Purge existing routes that are not found in
+      # purge_subnets: Purge existing subnets that are not found in
+      # purge_tags: Purge existing tags that are not found in route
+      # region: The AWS region to use. If not specified then the
+      # : ec2_region
+      # route_table_id: The ID of the route table to update or delete.
+      # routes: List of routes in the route table. Routes are
+      # security_token: AWS STS security token. If not set then the
+      # state: Create or destroy the VPC route table
+      # subnets: An array of subnets to add to this route table.
+      # tags: A dictionary of resource tags of the form: {
+      # validate_certs: When set to "no", SSL certificates will not be
+      # vpc_id: (required) VPC ID of the VPC in which to create
       - name: VPC route table.
         ec2_vpc_route_table:
-          aws_access_key: "#"
-          aws_secret_key: "#"
-          debug_botocore_endpoint_logs: "#"
-          ec2_url: "#"
-          lookup: "#"
-          profile: "#"
-          propagating_vgw_ids: "#"
-          purge_routes: "#"
-          purge_subnets: "#"
-          purge_tags: "#"
-          region: "#"
-          : "#"
-          route_table_id: "#"
-          routes: "#"
-          security_token: "#"
-          state: "#"
-          subnets: "#"
-          tags: "#"
-          validate_certs: "#"
-          vpc_id: "#"
-          become: true 
-          become_method: su 
-          become_user: nobody 
-          become_flags: "-s /bin/sh" 
-          when: variable is defined 
-          with_items: array 
-        register: route_table  
+          aws_access_key: "{{ sts_aws_access_key | default(omit) }}"
+          aws_secret_key: "{{ sts_aws_secret_key | default(omit) }}"
+          security_token: "{{ sts_security_token | default(omit) }}"
+          profile: "{{ profile }}"
+          region: "{{ region }}"
+          routes:
+            - dest: 0.0.0.0/0
+              gateway_id: "{{ igw.gateway_id }}"
+          state: present
+          subnets:
+            - "{{ subnet_one.subnet.id }}"
+            - "{{ subnet_two.subnet.id }}"
+          tags:
+            Name: PRT
+          vpc_id: " {{ vpc.vpc.id }} "
+        register: route_table
+
+
+      - name: Name for ec2_instance module.
+        ec2:
+          aws_access_key: "{{ sts_aws_access_key | default(omit) }}"
+          aws_secret_key: "{{ sts_aws_secret_key | default(omit) }}"
+          security_token: "{{ sts_security_token | default(omit) }}"
+          assign_public_ip: yes
+          count: 1
+          group_id: "{{ sg.group_id }}"
+          instance_type: t3a.small
+          key_name: "{{ key_name }}"
+          profile: "{{ profile }}"
+          region: "{{ region }}"
+          image: "{{ image }}"
+          instance_tags:
+              Name: TFPrestored
+          volumes:
+            - device_name: /dev/sdf
+              snapshot: snap-008982bac0121ef3e
+              volume_type: gp2
+              #iops: 100
+              volume_size: 10
+              delete_on_termination: false
+          vpc_subnet_id: "{{ subnet_one.subnet.id }}"
+      
     #tags: always
